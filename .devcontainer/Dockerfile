@@ -13,10 +13,17 @@ RUN wget https://github.com/typst/typst/releases/download/${TYPST_VERSION}/typst
 RUN cargo install typst-live
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install the notebookinator
 # We need to change the user here because typst local packages are installed per user
 USER vscode
 WORKDIR /home/vscode/
+
+# Install fonts
+RUN wget https://github.com/google/fonts/raw/main/ofl/blinker/Blinker-Regular.ttf && \
+    wget https://github.com/google/fonts/raw/main/ofl/firasans/FiraSans-Regular.ttf && \
+    mkdir -p /home/vscode/.local/share/fonts/ && \
+    mv ./*.ttf /home/vscode/.local/share/fonts
+
+# Install the notebookinator
 RUN git clone --depth 1 --branch ${NOTEBOOKiNATOR_VERSION} https://github.com/The-Notebookinator/notebookinator.git && \
     ./notebookinator/scripts/package @local && \
    rm -rf notebookinator

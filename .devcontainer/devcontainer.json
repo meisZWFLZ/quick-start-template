@@ -10,7 +10,7 @@
 		"vscode": {
 			"extensions": [
 				"nvarner.typst-lsp",
-				"tomoki1207.pdf"
+        "mathematic.vscode-pdf"
 			]
 		}
 	}

@@ -1,7 +1,5 @@
-#import "/packages.typ": notebookinator
-#import notebookinator: *
-#import themes.radial.components: *
+#import "/packages.typ": *
 
 #create-frontmatter-entry(title: "Table of Contents")[
-  #toc()
+  #components.toc()
 ]

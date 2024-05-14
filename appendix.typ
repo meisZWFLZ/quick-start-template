@@ -1,6 +1,4 @@
-#import "./packages.typ": notebookinator
-#import notebookinator: *
-#import themes.radial.components
+#import "./packages.typ": *
 
 #glossary.add-term(
   "Example word",

@@ -1,6 +1,5 @@
-#import "/packages.typ": notebookinator
-#import notebookinator: *
-#import themes.radial.components: *
+#import "/packages.typ": *
+#import components: *
 
 // The show rule passes all content in this file into the `create-body-entry` function.
 // This just means that we don't need an extra level of indentation when writing this entry.

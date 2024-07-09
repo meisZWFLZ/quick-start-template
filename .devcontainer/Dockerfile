@@ -4,12 +4,12 @@ FROM alpine:latest as fonts-fnt
 RUN apk add --no-cache git make curl bash
 
 # fake otfinfo and chafa as they are only required by fnt for a few commands but are always checked
-COPY /usr/bin/otfinfo <<EOF
+COPY <<EOF /usr/bin/otfinfo
 #!/bin/sh
 echo "otfinfo doesn't actually exist on this system and was faked in order to force necessary fnt features to work"
 exit 10
 EOF
-COPY /usr/bin/chafa <<EOF
+COPY <<EOF /usr/bin/chafa
 #!/bin/sh
 echo "chafa doesn't actually exist on this system and was faked in order to force necessary fnt features to work"
 exit 11
@@ -51,8 +51,8 @@ WORKDIR /home/vscode/
 # ARG TYPST_VERSION=v0.11.0
 ARG NOTEBOOKiNATOR_VERSION=patch-1
 # Install the notebookinator
-RUN git clone --depth 1 --branch ${NOTEBOOKiNATOR_VERSION} https://github.com/meisZWFLZ/notebookinator.git &&
-    ./notebookinator/scripts/package @local &&
+RUN git clone --depth 1 --branch ${NOTEBOOKiNATOR_VERSION} https://github.com/meisZWFLZ/notebookinator.git && \
+    ./notebookinator/scripts/package @local && \
     rm -rf notebookinator
 
 # install fonts

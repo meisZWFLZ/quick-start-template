@@ -3,24 +3,33 @@
 //! ```cargo
 //! [dependencies]
 //! crossterm = "0.25.0"
+//! chrono = "0.4.38"
+//! chrono-tz = "0.9.0"
+//! crossterm = "0.25.0"
+//! dateparser = "0.2.1"
 //! serde = { version = "1.0.204", features = ["derive"] }
 //! serde_json = "1.0.120"
 //! strip-ansi-escapes = "0.2.0"
 //! terminal-menu = "3.0.0"
-//! time = "0.3.36"
 //! typst = "0.11.1"
 //! ```
 
+extern crate chrono;
+extern crate chrono_tz;
+extern crate dateparser;
 extern crate terminal_menu;
-extern crate time;
 extern crate typst;
+
+use chrono::{offset::Local, TimeZone};
 
 use std::{
     collections::HashMap,
+    env::consts::OS,
     fs,
     io::Write,
     num::ParseIntError,
     process::Command,
+    str::FromStr,
     sync::{Arc, RwLock},
 };
 
@@ -30,7 +39,7 @@ use terminal_menu::{
     back_button, button, label, menu, mut_menu, run, scroll, string, submenu, TerminalMenuItem,
     TerminalMenuStruct,
 };
-use time::{macros::format_description, Date};
+
 pub struct MenuBuilder {
     items: Vec<TerminalMenuItem>,
 }
@@ -144,10 +153,14 @@ impl EntryType {
 
 fn query_entry_type_metadata() -> Box<dyn Iterator<Item = EntryType>> {
     let raw_metadata = String::from_utf8(
-        Command::new("bash")
-            .arg("-c")
-            .arg(
-                "typst query - '<entry-types>' --field value <<EOF
+        Command::new(if OS == "windows" {
+            "C:\\Program Files\\Git\\usr\\bin\\bash.exe"
+        } else {
+            "bash"
+        })
+        .arg("-c")
+        .arg(
+            "typst query - '<entry-types>' --field value <<EOF
 #import \"@local/notebookinator:1.0.1\": themes
 #metadata(
   dictionary(themes).pairs().map(((name, theme)) => {
@@ -161,10 +174,10 @@ fn query_entry_type_metadata() -> Box<dyn Iterator<Item = EntryType>> {
   }),
 ) <entry-types>
 EOF",
-            )
-            .output()
-            .expect("failed to query typst for entry-type-metadata")
-            .stdout,
+        )
+        .output()
+        .expect("failed to query typst for entry-type-metadata")
+        .stdout,
     )
     .unwrap();
     let wrapped_metadata = format!("{{ \"data\": {} }}", raw_metadata);
@@ -257,19 +270,16 @@ EOF",
     return EntryType::from_string_pairs(Box::new(default_theme.1.to_owned().into_iter()));
 }
 
-fn make_date_time_str(date: time::Date) -> String {
-    date.format(format_description!(
-        "datetime(year: [year], month: [month], day: [day])"
-    ))
-    .expect("Failed to parse date")
+fn make_date_time_str(date: chrono::DateTime<Local>) -> String {
+    date.format("datetime(year: %Y, month: %m, day: %d)")
+        .to_string()
 }
 
-fn main() {
+fn main() -> Result<(), String> {
     let entry_types = query_entry_type_metadata();
     let entry_types_vec: Vec<EntryType> = entry_types.collect();
-    let date_format_description = format_description!("[year]-[month]-[day]");
-    let todays_date = time::OffsetDateTime::now_utc();
-    let todays_date_str = todays_date.format(&date_format_description).unwrap();
+    let todays_date = chrono::Local::now();
+    let todays_date_str = todays_date.format("%F").to_string();
     // let mut entry_type_sub_menu = menu_builder();
     // for entry_type in query_entry_type_metadata()
     let my_menu = menu_builder()
@@ -310,14 +320,18 @@ fn main() {
     run(&my_menu);
     let my_mut_menu = mut_menu(&my_menu);
 
-    let date = Date::parse(
-        my_mut_menu.selection_value("date"),
-        &date_format_description,
-    )
-    .unwrap_or(todays_date.date());
+    let date = dateparser::parse_with_timezone(my_mut_menu.selection_value("date"), &Local)
+        .ok()
+        .and_then(|date| Local.from_local_datetime(&date.naive_local()).earliest())
+        .or_else(|| {
+            eprintln!("failed to parse date!");
+            None
+        })
+        .unwrap_or(todays_date);
     let date_string = make_date_time_str(date);
     let date_str = date_string.as_str();
-    let title = my_mut_menu.selection_value("title");
+    let title_input = my_mut_menu.selection_value("title");
+    let title = title_input.split('/').last().unwrap();
     let section = my_mut_menu.selection_value("section");
     let entry_type_string = String::from_utf8(strip_ansi_escapes::strip(
         my_mut_menu.selection_value("type"),
@@ -326,6 +340,10 @@ fn main() {
     let entry_type = entry_type_string.as_str();
     let author = my_mut_menu.selection_value("author");
     let witness = my_mut_menu.selection_value("witness");
+
+    if title.len() == 0 {
+        return Err(String::from_str("title must be specified!").unwrap());
+    };
 
     let entry_content = format!(
         "#import \"/packages.typ\": *
@@ -340,24 +358,48 @@ fn main() {
     witness: \"{witness}\",
 )"
     );
-    let entry_file_name = title.to_lowercase().replace(" ", "_");
-    fs::DirBuilder::new()
-        .create(format!("./entries/{}", entry_file_name))
-        .expect("failed to make entry directory");
-    let entry_file_path = &format!("./entries/{}/{}.typ", entry_file_name, entry_file_name);
-    let mut entry_file =
-        fs::File::create_new(entry_file_path).expect("failed to make entry typst file");
+
+    let entry_dir_path = "./entries/".to_owned()
+        + (title_input
+            .to_lowercase()
+            .replace(" ", "_")
+            .trim_end_matches("/"));
+    let entry_file_path_vec: Vec<&str> = entry_dir_path.split("/").collect();
+    let entry_file_name = entry_file_path_vec.last().unwrap();
+    {
+        let mut new_dir_path = String::from_str(entry_file_path_vec.first().unwrap()).unwrap();
+        for path_part in entry_file_path_vec.iter().skip(1) {
+            new_dir_path += "/";
+            new_dir_path += path_part;
+
+            fs::create_dir(new_dir_path.clone())
+                .or_else(|err| {
+                    if err.kind() == std::io::ErrorKind::AlreadyExists {
+                        Ok(())
+                    } else {
+                        Err(err)
+                    }
+                })
+                .expect(
+                    format!("Failed to make part of entry directory: ({})", new_dir_path).as_str(),
+                );
+        }
+    }
+
+    let entry_file_path = &format!("{}/{}.typ", entry_dir_path, entry_file_name);
+    let mut entry_file = fs::File::create_new(entry_file_path)
+        .expect(format!("Failed to make entry typst file ({})", entry_file_path).as_str());
     entry_file
         .write_all(entry_content.as_bytes())
-        .expect("failed to write to entry typst file");
+        .expect("Failed to write to entry typst file");
     entry_file
         .flush()
-        .expect("failed to flush to entry typst file");
+        .expect("Failed to flush to entry typst file");
 
     let mut entries_file = fs::File::options()
         .append(true)
         .open("./entries/entries.typ")
-        .expect("failed to open ./entries/entries.typ");
+        .expect("Failed to open ./entries/entries.typ");
     entries_file
         .write_all(
             format!(
@@ -366,8 +408,10 @@ fn main() {
             )
             .as_bytes(),
         )
-        .expect("failed to write to ./entries/entries.typ");
+        .expect("Failed to write to ./entries/entries.typ");
     entries_file
         .flush()
-        .expect("failed to flush to ./entries/entries.typ");
+        .expect("Failed to flush to ./entries/entries.typ");
+
+    Ok(())
 }

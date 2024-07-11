@@ -40,13 +40,13 @@ RUN rm Virgil.woff2
 # Create final product
 FROM mcr.microsoft.com/devcontainers/rust:bullseye as final
 
-# Install typst-live
-RUN cargo install typst-live
-ENV PATH="/root/.cargo/bin:${PATH}"
-
 # We need to change the user here because typst local packages are installed per user
 USER vscode
 WORKDIR /home/vscode/
+
+# We need to install typst-live after changing users, otherwise, vscode doesn't have the necessary permissions to 
+# Install typst-live
+RUN cargo install typst-live
 
 # ARG TYPST_VERSION=v0.11.0
 ARG NOTEBOOKiNATOR_VERSION=patch-1

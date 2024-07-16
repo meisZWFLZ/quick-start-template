@@ -1,5 +1,5 @@
 [package]
-name = "script"
+name = "add-entry"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,6 +10,5 @@ crossterm = "0.25.0"
 dateparser = "0.2.1"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_json = "1.0.120"
-strip-ansi-escapes = "0.2.0"
 terminal-menu = "3.0.0"
 typst = "0.11.1"

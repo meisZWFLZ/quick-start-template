@@ -275,6 +275,22 @@ fn make_date_time_str(date: chrono::DateTime<Local>) -> String {
         .to_string()
 }
 
+fn strip_ansi_color_escapes(s: &str) -> String {
+    let csi = "\x1B[";
+    s.split(csi)
+        .enumerate()
+        .map(|(i, e)| {
+            if i == 0 {
+                e
+            } else {
+                e.split_once("m")
+                    .and_then(|(_ansi_color, content)| Some(content))
+                    .unwrap_or(e)
+            }
+        })
+        .collect()
+}
+
 fn main() -> Result<(), String> {
     let entry_types = query_entry_type_metadata();
     let entry_types_vec: Vec<EntryType> = entry_types.collect();
@@ -333,11 +349,8 @@ fn main() -> Result<(), String> {
     let title_input = my_mut_menu.selection_value("title");
     let title = title_input.split('/').last().unwrap();
     let section = my_mut_menu.selection_value("section");
-    let entry_type_string = String::from_utf8(strip_ansi_escapes::strip(
-        my_mut_menu.selection_value("type"),
-    ))
-    .unwrap();
-    let entry_type = entry_type_string.as_str();
+    let entry_typed_string = strip_ansi_color_escapes(my_mut_menu.selection_value("type"));
+    let entry_type = entry_typed_string.as_str();
     let author = my_mut_menu.selection_value("author");
     let witness = my_mut_menu.selection_value("witness");
 

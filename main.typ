@@ -9,11 +9,7 @@
   theme: radial-theme, // TODO: change the theme to one you like
 )
 
-#text(font: ("Calibri","Carlito"))[BLAH BLAH BLAH DDDDDDDDDD]
-
 #include "./frontmatter.typ"
-
-#lorem(100)
 
 #include "./entries/entries.typ"
 

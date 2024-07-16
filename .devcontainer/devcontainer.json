@@ -11,7 +11,8 @@
 		"vscode": {
 			"extensions": [
 				"nvarner.typst-lsp",
-				"mathematic.vscode-pdf"
+				"mathematic.vscode-pdf",
+				"pomdtr.excalidraw-editor"
 			]
 		}
 	},

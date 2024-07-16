@@ -37,6 +37,16 @@ RUN wget https://virgil.excalidraw.com/Virgil.woff2 -O ./Virgil.woff2
 RUN woff2_decompress Virgil.woff2
 RUN rm Virgil.woff2
 
+# create add-entry binary
+FROM rust:1-bullseye as add-entry-binary
+COPY scripts scripts
+RUN cargo install --root /usr/local/cargo/ --path ./scripts/add-entry
+
+# create typst-live binary
+FROM rust:1-bullseye as typst-live-binary
+
+RUN cargo install --root /usr/local/cargo/ typst-live
+
 # Create final product
 FROM mcr.microsoft.com/devcontainers/rust:bullseye as final
 
@@ -44,17 +54,15 @@ FROM mcr.microsoft.com/devcontainers/rust:bullseye as final
 USER vscode
 WORKDIR /home/vscode/
 
-# We need to install typst-live after changing users, otherwise, vscode doesn't have the necessary permissions to 
-# Install typst-live
-RUN cargo install typst-live
-
-# ARG TYPST_VERSION=v0.11.0
-ARG NOTEBOOKiNATOR_VERSION=patch-1
+ARG NOTEBOOKINATOR_VERSION=1.0.1
+ARG NOTEBOOKINATOR_REPO=https://github.com/The-Notebookinator/notebookinator.git
 # Install the notebookinator
-RUN git clone --depth 1 --branch ${NOTEBOOKiNATOR_VERSION} https://github.com/meisZWFLZ/notebookinator.git && \
+RUN git clone --depth 1 --branch ${NOTEBOOKINATOR_VERSION} ${NOTEBOOKINATOR_REPO} notebookinator && \
     ./notebookinator/scripts/package @local && \
     rm -rf notebookinator
 
 # install fonts
 COPY --from=fonts-fnt /fonts/* /usr/local/share/fonts/
 COPY --from=fonts-virgil /Virgil.ttf /usr/local/share/fonts/
+COPY --from=typst-live-binary /usr/local/cargo/bin/* /usr/local/cargo/bin/
+COPY --from=add-entry-binary /usr/local/cargo/bin/* /usr/local/cargo/bin/

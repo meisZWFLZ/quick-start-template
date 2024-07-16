@@ -426,5 +426,11 @@ fn main() -> Result<(), String> {
         .flush()
         .expect("Failed to flush to ./entries/entries.typ");
 
+    // open the entry in vscode
+    Command::new("code")
+        .arg("-r")
+        .arg(entry_file_path)
+        .spawn()
+        .unwrap();
     Ok(())
 }

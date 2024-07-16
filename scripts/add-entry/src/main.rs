@@ -152,15 +152,14 @@ impl EntryType {
 }
 
 fn query_entry_type_metadata() -> Box<dyn Iterator<Item = EntryType>> {
-    let raw_metadata = String::from_utf8(
-        Command::new(if OS == "windows" {
-            "C:\\Program Files\\Git\\usr\\bin\\bash.exe"
-        } else {
-            "bash"
-        })
-        .arg("-c")
-        .arg(
-            "typst query - '<entry-types>' --field value <<EOF
+    let raw_metadata_output = Command::new(if OS == "windows" {
+        "C:\\Program Files\\Git\\usr\\bin\\bash.exe"
+    } else {
+        "bash"
+    })
+    .arg("-c")
+    .arg(
+        "typst query - '<entry-types>' --field value <<EOF
 #import \"@local/notebookinator:1.0.1\": themes
 #metadata(
   dictionary(themes).pairs().map(((name, theme)) => {
@@ -174,15 +173,30 @@ fn query_entry_type_metadata() -> Box<dyn Iterator<Item = EntryType>> {
   }),
 ) <entry-types>
 EOF",
-        )
-        .output()
-        .expect("failed to query typst for entry-type-metadata")
-        .stdout,
     )
-    .unwrap();
+    .output()
+    .inspect_err(|e| eprint!("typst query command failed: {:?}", e))
+    .expect("failed to retrieve entry type metadata from notebookinator!");
+    let raw_metadata = String::from_utf8(raw_metadata_output.stdout).unwrap();
+    let raw_metadata_output_stderr = String::from_utf8(raw_metadata_output.stderr).unwrap();
+    if raw_metadata.len() == 0 {
+        panic!(
+            "Failed to retrieve entry type metadata from notebookinator!: {}",
+            raw_metadata_output_stderr
+        )
+    }
     let wrapped_metadata = format!("{{ \"data\": {} }}", raw_metadata);
     let deserialized_metadata: NotebookinatorEntryTypeMetadata =
-        serde_json::de::from_str(&wrapped_metadata).expect("failed to parse metadata");
+        serde_json::de::from_str(&wrapped_metadata)
+            .inspect_err(|e| {
+                panic!(
+                    "failed to parse entry type metadata from notebookinator: 
+            error: {:?}
+            metadata: {:?}",
+                    e, wrapped_metadata
+                )
+            })
+            .unwrap();
     let theme_entries_map: HashMap<String, Vec<(String, String)>> = deserialized_metadata
         .data
         .0
